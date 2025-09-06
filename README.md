@@ -1,5 +1,8 @@
 # go-sqlite3
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/eloonstra/go-sqlite3.svg)](https://pkg.go.dev/github.com/eloonstra/go-sqlite3)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Pure Go SQLite3 driver using dynamic linking.
 
 > [!WARNING]  
