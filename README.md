@@ -2,6 +2,10 @@
 
 Pure Go SQLite3 driver using dynamic linking.
 
+> [!WARNING]  
+> This driver is very early in development and should not be used in production environments. Critical features may be
+> missing or unstable.
+
 ## Features
 
 - No CGO required, uses dynamic linking via [ebitengine/purego](https://github.com/ebitengine/purego)
