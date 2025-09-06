@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 )
 
@@ -13,7 +14,7 @@ type Tx struct {
 
 func (t *Tx) Commit() error {
 	if t.finished {
-		return fmt.Errorf("transaction already finished")
+		return errors.New("transaction already finished")
 	}
 
 	t.conn.mu.Lock()

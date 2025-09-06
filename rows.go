@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -138,7 +139,7 @@ func (r *Rows) ColumnTypeScanType(index int) reflect.Type {
 	case SQLITE_BLOB:
 		return reflect.TypeOf([]byte{})
 	default:
-		return reflect.TypeOf(new(interface{})).Elem()
+		return reflect.TypeOf(new(any)).Elem()
 	}
 }
 
@@ -147,7 +148,7 @@ func (r *Rows) HasNextResultSet() bool {
 }
 
 func (r *Rows) NextResultSet() error {
-	return fmt.Errorf("multiple result sets not supported")
+	return errors.New("multiple result sets not supported")
 }
 
 var (

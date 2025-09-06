@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -54,7 +55,7 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	}
 
 	if s.closed {
-		return nil, fmt.Errorf("statement closed")
+		return nil, errors.New("statement closed")
 	}
 
 	if err := s.bind(args); err != nil {
@@ -93,7 +94,7 @@ func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	}
 
 	if s.closed {
-		return nil, fmt.Errorf("statement closed")
+		return nil, errors.New("statement closed")
 	}
 
 	if err := s.bind(args); err != nil {
@@ -144,7 +145,7 @@ func (s *Stmt) bind(args []driver.NamedValue) error {
 	return nil
 }
 
-func (s *Stmt) bindValue(idx int, value interface{}) error {
+func (s *Stmt) bindValue(idx int, value any) error {
 	var rc int
 
 	if value == nil {

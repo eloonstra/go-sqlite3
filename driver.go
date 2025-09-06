@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -89,7 +90,7 @@ func parseDSN(dsn string) (*config, error) {
 	}
 
 	if dsn == "" {
-		return nil, fmt.Errorf("empty DSN")
+		return nil, errors.New("empty DSN")
 	}
 
 	if strings.HasPrefix(dsn, "file:") {
