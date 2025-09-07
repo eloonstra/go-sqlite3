@@ -70,7 +70,7 @@ func (r *Rows) scanColumn(i int, colType int) driver.Value {
 		return nil
 	case SQLITE_INTEGER:
 		return sqlite3_column_int64(r.stmt.stmt, i)
-	case SQLITE_FLOAT:
+	case SQLITE_REAL:
 		return sqlite3_column_double(r.stmt.stmt, i)
 	case SQLITE_TEXT:
 		textPtr := sqlite3_column_text(r.stmt.stmt, i)
@@ -102,7 +102,7 @@ func (r *Rows) ColumnTypeDatabaseTypeName(index int) string {
 	switch colType {
 	case SQLITE_INTEGER:
 		return "INTEGER"
-	case SQLITE_FLOAT:
+	case SQLITE_REAL:
 		return "REAL"
 	case SQLITE_TEXT:
 		return "TEXT"
