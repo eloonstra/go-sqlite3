@@ -77,6 +77,7 @@ var (
 	sqlite3_reset                func(stmt uintptr) int
 	sqlite3_column_count         func(stmt uintptr) int
 	sqlite3_column_name          func(stmt uintptr, n int) uintptr
+	sqlite3_column_decltype      func(stmt uintptr, n int) uintptr
 	sqlite3_column_type          func(stmt uintptr, iCol int) int
 	sqlite3_column_int64         func(stmt uintptr, iCol int) int64
 	sqlite3_column_double        func(stmt uintptr, iCol int) float64
@@ -173,6 +174,7 @@ func registerFunctions() error {
 	purego.RegisterLibFunc(&sqlite3_reset, libsqlite3, "sqlite3_reset")
 	purego.RegisterLibFunc(&sqlite3_column_count, libsqlite3, "sqlite3_column_count")
 	purego.RegisterLibFunc(&sqlite3_column_name, libsqlite3, "sqlite3_column_name")
+	purego.RegisterLibFunc(&sqlite3_column_decltype, libsqlite3, "sqlite3_column_decltype")
 	purego.RegisterLibFunc(&sqlite3_column_type, libsqlite3, "sqlite3_column_type")
 	purego.RegisterLibFunc(&sqlite3_column_int64, libsqlite3, "sqlite3_column_int64")
 	purego.RegisterLibFunc(&sqlite3_column_double, libsqlite3, "sqlite3_column_double")

@@ -2,11 +2,13 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 )
 
 type Rows struct {
@@ -91,6 +93,11 @@ func (r *Rows) ColumnTypeDatabaseTypeName(index int) string {
 		return ""
 	}
 
+	declTypePtr := sqlite3_column_decltype(r.stmt.stmt, index)
+	if declTypePtr != 0 {
+		return goString(declTypePtr)
+	}
+
 	colType := sqlite3_column_type(r.stmt.stmt, index)
 	switch colType {
 	case SQLITE_INTEGER:
@@ -128,19 +135,37 @@ func (r *Rows) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
 }
 
 func (r *Rows) ColumnTypeScanType(index int) reflect.Type {
-	colType := sqlite3_column_type(r.stmt.stmt, index)
-	switch colType {
-	case SQLITE_INTEGER:
-		return reflect.TypeOf(int64(0))
-	case SQLITE_FLOAT:
-		return reflect.TypeOf(float64(0))
-	case SQLITE_TEXT:
-		return reflect.TypeOf("")
-	case SQLITE_BLOB:
-		return reflect.TypeOf([]byte{})
-	default:
-		return reflect.TypeOf(new(any)).Elem()
+	declTypePtr := sqlite3_column_decltype(r.stmt.stmt, index)
+	declType := strings.ToUpper(goString(declTypePtr))
+	if strings.Contains(declType, "INT") {
+		return reflect.TypeOf(sql.NullInt64{})
 	}
+
+	if strings.Contains(declType, "CHAR") || strings.Contains(declType, "CLOB") || strings.Contains(declType, "TEXT") {
+		return reflect.TypeOf(sql.NullString{})
+	}
+
+	if strings.Contains(declType, "BLOB") {
+		return reflect.TypeOf(sql.RawBytes{})
+	}
+
+	if strings.Contains(declType, "REAL") || strings.Contains(declType, "FLOA") || strings.Contains(declType, "DOUB") {
+		return reflect.TypeOf(sql.NullFloat64{})
+	}
+
+	if strings.Contains(declType, "BOOL") {
+		return reflect.TypeOf(sql.NullBool{})
+	}
+
+	if strings.Contains(declType, "DATE") || strings.Contains(declType, "TIME") {
+		return reflect.TypeOf(sql.NullTime{})
+	}
+
+	if strings.Contains(declType, "NUMERIC") || strings.Contains(declType, "DECIMAL") || strings.Contains(declType, "NUMBER") {
+		return reflect.TypeOf(sql.NullFloat64{})
+	}
+
+	return reflect.TypeOf(new(any)).Elem()
 }
 
 func (r *Rows) HasNextResultSet() bool {
