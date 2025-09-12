@@ -551,3 +551,285 @@ func TestReadOnlyMode(t *testing.T) {
 		t.Error("Expected error when writing to readonly database")
 	}
 }
+
+func TestDeclaredTypeHandling(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE type_test (
+			id INTEGER PRIMARY KEY,
+			bool_int BOOLEAN,
+			date_text DATE,
+			time_text TIME,
+			datetime_text DATETIME,
+			timestamp_int TIMESTAMP,
+			timestamp_real TIMESTAMP,
+			regular_int INTEGER,
+			regular_text TEXT
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	t.Run("Boolean as INTEGER", func(t *testing.T) {
+		_, err := db.Exec("INSERT INTO type_test (bool_int) VALUES (?)", true)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result bool
+		err = db.QueryRow("SELECT bool_int FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if !result {
+			t.Errorf("Expected true, got false")
+		}
+
+		_, err = db.Exec("INSERT INTO type_test (bool_int) VALUES (?)", false)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		err = db.QueryRow("SELECT bool_int FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if result {
+			t.Errorf("Expected false, got true")
+		}
+	})
+
+	t.Run("DateTime as TEXT", func(t *testing.T) {
+		testTime := time.Date(2024, 3, 15, 14, 30, 45, 123456789, time.UTC)
+
+		_, err := db.Exec("INSERT INTO type_test (datetime_text) VALUES (?)", testTime.Format(time.RFC3339Nano))
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT datetime_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if !result.Equal(testTime.Truncate(time.Nanosecond)) {
+			t.Errorf("Expected %v, got %v", testTime, result)
+		}
+	})
+
+	t.Run("Date only", func(t *testing.T) {
+		_, err := db.Exec("INSERT INTO type_test (date_text) VALUES (?)", "2024-03-15")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT date_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		expected := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+		if !result.Equal(expected) {
+			t.Errorf("Expected %v, got %v", expected, result)
+		}
+	})
+
+	t.Run("Time only", func(t *testing.T) {
+		_, err := db.Exec("INSERT INTO type_test (time_text) VALUES (?)", "14:30:45.123")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT time_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		expected := time.Date(0, 1, 1, 14, 30, 45, 123000000, time.UTC)
+		if !result.Equal(expected) {
+			t.Errorf("Expected %v, got %v", expected, result)
+		}
+	})
+
+	t.Run("Unix timestamp as INTEGER", func(t *testing.T) {
+		testTime := time.Date(2024, 3, 15, 14, 30, 45, 0, time.UTC)
+		unixTimestamp := testTime.Unix()
+
+		_, err := db.Exec("INSERT INTO type_test (timestamp_int) VALUES (?)", unixTimestamp)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT timestamp_int FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if !result.Equal(testTime) {
+			t.Errorf("Expected %v, got %v", testTime, result)
+		}
+	})
+
+	t.Run("Unix milliseconds as INTEGER", func(t *testing.T) {
+		testTime := time.Date(2024, 3, 15, 14, 30, 45, 123000000, time.UTC)
+		unixMillis := testTime.UnixMilli()
+
+		_, err := db.Exec("INSERT INTO type_test (timestamp_int) VALUES (?)", unixMillis)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT timestamp_int FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if !result.Equal(testTime) {
+			t.Errorf("Expected %v, got %v", testTime, result)
+		}
+	})
+
+	t.Run("Unix timestamp with fractional seconds as REAL", func(t *testing.T) {
+		testTime := time.Date(2024, 3, 15, 14, 30, 45, 123456789, time.UTC)
+		unixFloat := float64(testTime.Unix()) + float64(testTime.Nanosecond())/1e9
+
+		_, err := db.Exec("INSERT INTO type_test (timestamp_real) VALUES (?)", unixFloat)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT timestamp_real FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		// Float precision limits mean we can't expect exact nanosecond precision
+		diff := result.Sub(testTime).Abs()
+		if diff > time.Microsecond {
+			t.Errorf("Expected %v, got %v (diff: %v)", testTime, result, diff)
+		}
+	})
+
+	t.Run("Julian day as REAL", func(t *testing.T) {
+		testTime := time.Date(2024, 3, 15, 14, 30, 45, 0, time.UTC)
+		julianDay := timeToJulian(testTime)
+
+		_, err := db.Exec("INSERT INTO type_test (timestamp_real) VALUES (?)", julianDay)
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT timestamp_real FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		diff := result.Sub(testTime).Abs()
+		if diff > time.Millisecond {
+			t.Errorf("Expected %v, got %v (diff: %v)", testTime, result, diff)
+		}
+	})
+
+	t.Run("Regular types not converted", func(t *testing.T) {
+		unixTimestamp := time.Now().Unix()
+
+		_, err := db.Exec("INSERT INTO type_test (regular_int, regular_text) VALUES (?, ?)",
+			unixTimestamp, "2024-03-15")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var intResult int64
+		var textResult string
+		err = db.QueryRow("SELECT regular_int, regular_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(
+			&intResult, &textResult)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if intResult != unixTimestamp {
+			t.Errorf("Expected int %d, got %d", unixTimestamp, intResult)
+		}
+
+		if textResult != "2024-03-15" {
+			t.Errorf("Expected text '2024-03-15', got %s", textResult)
+		}
+	})
+
+	t.Run("SQLite functions", func(t *testing.T) {
+		_, err := db.Exec("INSERT INTO type_test (datetime_text) VALUES (datetime('2024-03-15 14:30:45'))")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var result time.Time
+		err = db.QueryRow("SELECT datetime_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		expected := time.Date(2024, 3, 15, 14, 30, 45, 0, time.UTC)
+		if !result.Equal(expected) {
+			t.Errorf("Expected %v, got %v", expected, result)
+		}
+	})
+
+	t.Run("CURRENT_TIMESTAMP", func(t *testing.T) {
+		before := time.Now().UTC()
+
+		_, err := db.Exec("INSERT INTO type_test (timestamp_int) VALUES (CAST(strftime('%s', 'now') AS INTEGER))")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		after := time.Now().UTC()
+
+		var result time.Time
+		err = db.QueryRow("SELECT timestamp_int FROM type_test ORDER BY id DESC LIMIT 1").Scan(&result)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if result.Before(before.Truncate(time.Second)) || result.After(after.Add(time.Second)) {
+			t.Errorf("Timestamp %v not within expected range [%v, %v]", result, before, after)
+		}
+	})
+
+	t.Run("NULL handling", func(t *testing.T) {
+		_, err := db.Exec("INSERT INTO type_test (bool_int, datetime_text) VALUES (NULL, NULL)")
+		if err != nil {
+			t.Fatalf("Failed to insert: %v", err)
+		}
+
+		var boolNull sql.NullBool
+		var timeNull sql.NullTime
+		err = db.QueryRow("SELECT bool_int, datetime_text FROM type_test ORDER BY id DESC LIMIT 1").Scan(
+			&boolNull, &timeNull)
+		if err != nil {
+			t.Fatalf("Failed to scan: %v", err)
+		}
+
+		if boolNull.Valid {
+			t.Errorf("Expected NULL bool, got %v", boolNull.Bool)
+		}
+
+		if timeNull.Valid {
+			t.Errorf("Expected NULL time, got %v", timeNull.Time)
+		}
+	})
+}

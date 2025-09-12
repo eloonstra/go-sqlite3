@@ -58,24 +58,57 @@ func (r *Rows) Next(dest []driver.Value) error {
 
 	for i := range dest {
 		colType := sqlite3_column_type(r.stmt.stmt, i)
-		dest[i] = r.scanColumn(i, colType)
+		declTypePtr := sqlite3_column_decltype(r.stmt.stmt, i)
+		declType := strings.ToUpper(goString(declTypePtr))
+		dest[i] = r.scanColumn(i, colType, declType)
 	}
 
 	return nil
 }
 
-func (r *Rows) scanColumn(i int, colType int) driver.Value {
+func (r *Rows) scanColumn(i int, colType int, declType string) driver.Value {
+	isTimeType := false
+	isBoolType := false
+	if declType != "" {
+		upperDecl := strings.ToUpper(declType)
+		isTimeType = strings.Contains(upperDecl, "DATE") ||
+			strings.Contains(upperDecl, "TIME") ||
+			strings.Contains(upperDecl, "TIMESTAMP")
+		isBoolType = strings.Contains(upperDecl, "BOOL")
+	}
+
 	switch colType {
 	case SQLITE_NULL:
 		return nil
 	case SQLITE_INTEGER:
-		return sqlite3_column_int64(r.stmt.stmt, i)
+		intVal := sqlite3_column_int64(r.stmt.stmt, i)
+		if isBoolType {
+			return intVal != 0
+		}
+		if isTimeType {
+			if t, ok := parseTimeInteger(intVal); ok {
+				return t
+			}
+		}
+		return intVal
 	case SQLITE_REAL:
-		return sqlite3_column_double(r.stmt.stmt, i)
+		floatVal := sqlite3_column_double(r.stmt.stmt, i)
+		if isTimeType {
+			if t, ok := parseTimeFloat(floatVal); ok {
+				return t
+			}
+		}
+		return floatVal
 	case SQLITE_TEXT:
 		textPtr := sqlite3_column_text(r.stmt.stmt, i)
 		length := sqlite3_column_bytes(r.stmt.stmt, i)
-		return goStringN(textPtr, length)
+		textVal := goStringN(textPtr, length)
+		if isTimeType {
+			if t, ok := parseTimeString(textVal); ok {
+				return t
+			}
+		}
+		return textVal
 	case SQLITE_BLOB:
 		blobPtr := sqlite3_column_blob(r.stmt.stmt, i)
 		length := sqlite3_column_bytes(r.stmt.stmt, i)
